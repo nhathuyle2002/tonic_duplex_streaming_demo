@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package consensus_service;
+
+service ConsensusApi {
+    rpc start_stream(stream ConsensusRequest) returns (stream ConsensusResponse) {};
+}
+
+message ConsensusRequest {
+    string tx = 1;
+}
+
+message ConsensusResponse {
+    int64 tx_hash = 1;
+}
