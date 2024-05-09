@@ -7,13 +7,16 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
+use std::sync::{Arc, Mutex};
 
 pub mod consensus_service {
     tonic::include_proto!("consensus_service");
 }
 
 #[derive(Default)]
-struct ScalarConsensusApi;
+struct ScalarConsensusApi{
+    id_map: Arc<Mutex<HashMap<String, i64>>>,
+}
 
 #[tonic::async_trait]
 impl ConsensusApi for ScalarConsensusApi {
@@ -28,21 +31,18 @@ impl ConsensusApi for ScalarConsensusApi {
     ) -> Result<Response<Self::start_streamStream>, Status> 
     {
         let mut request_stream = request.into_inner();
-        let mut id_map: HashMap<String, i64> = HashMap::new();
-
         let (tx, mut rx) = tokio::sync::mpsc::channel(16);
         while let Some(req) = request_stream.next().await {
             // Process the request, generate a response
-            let tx_clone = tx.clone();
             info!("Receive request {:?}", req);
             let req = req.expect("No data");
-            let _size = id_map.len();
-            let tx_hash = *id_map.entry(req.tx)
-                .or_insert(_size as i64);
+            let tx_clone = tx.clone();
+            let id_map = self.id_map.clone();
             tokio::spawn(async move {
+                let _size = id_map.lock().unwrap().len();
+                let tx_hash = *id_map.lock().unwrap().entry(req.tx).or_insert(_size as i64);
                 tx_clone.send(tx_hash).await.expect("Cannot send tx");
             });
-            
         }
 
         let response_stream = async_stream::stream! {
@@ -58,17 +58,18 @@ impl ConsensusApi for ScalarConsensusApi {
 
 struct ConsensusServer {
     addr: SocketAddr,
+    id_map: Arc<Mutex<HashMap<String, i64>>>,
 }
 
 impl ConsensusServer {
     fn new(addr: String) -> Self {
         let addr = addr.parse().expect("Wrong address format!!!");
-        Self { addr }
+        Self { addr, id_map: Arc::new(Mutex::new(HashMap::new())) }
     }
 
     async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Run server");
-        let my_scalar_consensus_api = ScalarConsensusApi::default();
+        let my_scalar_consensus_api = ScalarConsensusApi {id_map: self.id_map.clone()};
         tonic::transport::Server::builder()
             .add_service(ConsensusApiServer::new(my_scalar_consensus_api))
             .serve(self.addr.clone())
