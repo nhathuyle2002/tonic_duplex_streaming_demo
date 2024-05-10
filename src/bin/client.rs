@@ -28,7 +28,7 @@ impl ConsensusTask {
     async fn call_stream(client: &mut ConsensusApiClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
         let (tx, mut rx) = tokio::sync::mpsc::channel(16);
         
-        for i in 0..20 {
+        for i in 0..1000000000 {
             let tx_clone = tx.clone();
             tokio::spawn(async move {
                 // let mut input = String::new();
