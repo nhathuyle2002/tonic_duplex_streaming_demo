@@ -28,19 +28,6 @@ impl ConsensusTask {
     async fn call_stream(client: &mut ConsensusApiClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
         let (tx, mut rx) = tokio::sync::mpsc::channel(16);
         
-        for i in 0..1000000000 {
-            let tx_clone = tx.clone();
-            tokio::spawn(async move {
-                // let mut input = String::new();
-                // print!("Enter tx: ");
-                // std::io::stdin().read_line(&mut input);
-                // let input = input.trim().to_string();
-                let input = String::from(format!("Hello {}th", i));
-                info!("New tx: {}", &input);
-                tx_clone.send(input).await.expect("Cannot send tx");
-            });
-        }
-        
         let request_stream = async_stream::stream! {
             while let Some(tx) = rx.recv().await {
                 info!("New rx from tx: {}", &tx);
@@ -49,15 +36,29 @@ impl ConsensusTask {
         };
 
         let request_stream = Request::new(request_stream);
+
+        tokio::spawn(async move {
+            for i in 0..100 {
+                let tx_clone = tx.clone();
+                // let mut input = String::new();
+                // print!("Enter tx: ");
+                // std::io::stdin().read_line(&mut input);
+                // let input = input.trim().to_string();
+                let input = String::from(format!("Hello {}th", i));
+                info!("New tx: {}", &input);
+                tx_clone.send(input).await.expect("Cannot send tx");
+            }
+        });
+
         let response_stream = client.start_stream(request_stream).await?;
-        let mut inbound = response_stream.into_inner();
 
-        info!("hello");
-
-        while let Some(res) = inbound.next().await {
-            let res = res.expect("Empty response");
-            info!("Receive tx_hash: {}", res.tx_hash);
-        }
+        // tokio::spawn(async move {
+            let mut inbound = response_stream.into_inner();
+            while let Some(res) = inbound.next().await {
+                let res = res.expect("Empty response");
+                info!("Receive tx_hash: {}", res.tx_hash);
+            }
+        // });
         Ok(())
     }
 }

@@ -32,18 +32,6 @@ impl ConsensusApi for ScalarConsensusApi {
     {
         let mut request_stream = request.into_inner();
         let (tx, mut rx) = tokio::sync::mpsc::channel(16);
-        while let Some(req) = request_stream.next().await {
-            // Process the request, generate a response
-            info!("Receive request {:?}", req);
-            let req = req.expect("No data");
-            let tx_clone = tx.clone();
-            let id_map = self.id_map.clone();
-            tokio::spawn(async move {
-                let _size = id_map.lock().unwrap().len();
-                let tx_hash = *id_map.lock().unwrap().entry(req.tx).or_insert(_size as i64);
-                tx_clone.send(tx_hash).await.expect("Cannot send tx");
-            });
-        }
 
         let response_stream = async_stream::stream! {
             while let Some(tx_hash) = rx.recv().await {
@@ -51,6 +39,20 @@ impl ConsensusApi for ScalarConsensusApi {
                 yield Ok(response);
             }
         };
+
+        let id_map = self.id_map.clone();
+        tokio::spawn(async move {
+            while let Some(req) = request_stream.next().await {
+                // Process the request, generate a response
+                info!("Receive request {:?}", req);
+                let req = req.expect("No data");
+                let tx_clone = tx.clone();
+                let id_map_clone = id_map.clone();
+                let _size = id_map_clone.lock().unwrap().len();
+                let tx_hash = *id_map_clone.lock().unwrap().entry(req.tx).or_insert(_size as i64);
+                tx_clone.send(tx_hash).await.expect("Cannot send tx_hash");
+            }
+        });
         
         Ok(Response::new(Box::pin(response_stream) as Self::start_streamStream))
     }
