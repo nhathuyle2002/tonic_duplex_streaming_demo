@@ -48,9 +48,11 @@ impl ConsensusApi for ScalarConsensusApi {
                 let req = req.expect("No data");
                 let tx_clone = tx.clone();
                 let id_map_clone = id_map.clone();
-                let _size = id_map_clone.lock().unwrap().len();
-                let tx_hash = *id_map_clone.lock().unwrap().entry(req.tx).or_insert(_size as i64);
-                tx_clone.send(tx_hash).await.expect("Cannot send tx_hash");
+                tokio::spawn(async move {
+                    let _size = id_map_clone.lock().unwrap().len();
+                    let tx_hash = *id_map_clone.lock().unwrap().entry(req.tx).or_insert(_size as i64);
+                    tx_clone.send(tx_hash).await.expect("Cannot send tx_hash");
+                });
             }
         });
         

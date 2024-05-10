@@ -37,8 +37,10 @@ impl ConsensusTask {
 
         let request_stream = Request::new(request_stream);
 
+        let response_stream = client.start_stream(request_stream).await?;
+
         tokio::spawn(async move {
-            for i in 0..100 {
+            for i in 0..10000 {
                 let tx_clone = tx.clone();
                 // let mut input = String::new();
                 // print!("Enter tx: ");
@@ -46,14 +48,16 @@ impl ConsensusTask {
                 // let input = input.trim().to_string();
                 let input = String::from(format!("Hello {}th", i));
                 info!("New tx: {}", &input);
-                tx_clone.send(input).await.expect("Cannot send tx");
+                tokio::spawn(async move {
+                    tx_clone.send(input).await.expect("Cannot send tx");
+                });
             }
         });
 
-        let response_stream = client.start_stream(request_stream).await?;
+        let mut inbound = response_stream.into_inner();
 
         // tokio::spawn(async move {
-            let mut inbound = response_stream.into_inner();
+            
             while let Some(res) = inbound.next().await {
                 let res = res.expect("Empty response");
                 info!("Receive tx_hash: {}", res.tx_hash);
