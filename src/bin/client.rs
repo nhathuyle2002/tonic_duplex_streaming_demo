@@ -5,9 +5,12 @@ use tracing_subscriber::FmtSubscriber;
 use tokio_stream::{StreamExt, Stream};
 use tonic::{transport::Channel, Request, Response, Status, Streaming};
 use consensus_service::{ConsensusRequest, ConsensusResponse};
+use std::thread::{self, sleep};
+use std::time::Duration;
 
 pub mod consensus_service {
-    tonic::include_proto!("consensus_service");
+    // tonic::include_proto!("consensus_service");
+    include!("../consensus_service.rs");
 }
 
 struct ConsensusTask {
@@ -40,7 +43,7 @@ impl ConsensusTask {
         let response_stream = client.start_stream(request_stream).await?;
 
         tokio::spawn(async move {
-            for i in 0..10000 {
+            for i in 0..1000 {
                 let tx_clone = tx.clone();
                 // let mut input = String::new();
                 // print!("Enter tx: ");
@@ -49,6 +52,7 @@ impl ConsensusTask {
                 let input = String::from(format!("Hello {}th", i));
                 info!("New tx: {}", &input);
                 tokio::spawn(async move {
+                    thread::sleep(Duration::from_millis(100));
                     tx_clone.send(input).await.expect("Cannot send tx");
                 });
             }

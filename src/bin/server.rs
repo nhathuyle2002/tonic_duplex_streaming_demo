@@ -8,9 +8,13 @@ use std::pin::Pin;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
 
 pub mod consensus_service {
-    tonic::include_proto!("consensus_service");
+    // tonic::include_proto!("consensus_service");
+    include!("../consensus_service.rs");
 }
 
 #[derive(Default)]
@@ -51,6 +55,7 @@ impl ConsensusApi for ScalarConsensusApi {
                 tokio::spawn(async move {
                     let _size = id_map_clone.lock().unwrap().len();
                     let tx_hash = *id_map_clone.lock().unwrap().entry(req.tx).or_insert(_size as i64);
+                    thread::sleep(Duration::from_millis(100));
                     tx_clone.send(tx_hash).await.expect("Cannot send tx_hash");
                 });
             }
